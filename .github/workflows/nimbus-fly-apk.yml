@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   FLUTTER_VERSION: '3.47.6'
@@ -51,6 +51,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
+          printf 'storePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/local.properties
+
+      - name: Set release version
+        run: |
+          sed -i "s/^version: .*/version: 1.0.${GITHUB_RUN_NUMBER}+${GITHUB_RUN_NUMBER}/" pubspec.yaml
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -59,10 +77,22 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: dart setup.dart android --arch arm64 -v
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: nimbus-fly-arm64-apk
           path: dist/*.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nimbus-fly-v1.0.${{ github.run_number }}
+          name: Nimbus Fly v1.0.${{ github.run_number }}
+          body: |
+            Nimbus Fly Android arm64 build.
+          files: dist/*.apk
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
