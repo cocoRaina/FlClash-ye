@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-     applicationId="com.cocoraina.flclash"
+        applicationId = "com.cocoraina.nimbusfly"
         minSdk = flutter.minSdkVersion
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = flutter.versionCode
